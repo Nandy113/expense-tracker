@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Expense Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f7fafc;
+            color: #2d3748;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); margin-bottom: 20px; padding: 20px; }
+        .grid { display: grid; gap: 16px; }
+        .grid-2 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .grid-3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+        .grid-5 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+        .flex { display: flex; align-items: center; }
+        .flex-between { justify-content: space-between; }
+        .flex-wrap { flex-wrap: wrap; gap: 8px; }
+        input, select, button { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; }
+        input:focus, select:focus { outline: none; border-color: #3182ce; }
+        button { background: #3182ce; color: white; border: none; cursor: pointer; font-weight: 500; }
+        button:hover { background: #2c5aa0; }
+        button.secondary { background: #e2e8f0; color: #4a5568; }
+        button.secondary:hover { background: #cbd5e0; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+        .badge-red { background: #fed7d7; color: #c53030; }
+        .badge-blue { background: #bee3f8; color: #2b6cb0; }
+        .badge-green { background: #c6f6d5; color: #25855a; }
+        .badge-purple { background: #e9d8fd; color: #6b46c1; }
+        .badge-orange { background: #fbd38d; color: #c05621; }
+        .badge-pink { background: #fed7e2; color: #b83280; }
+        .badge-teal { background: #b2f5ea; color: #2c7a7b; }
+        .badge-cyan { background: #c4f1f9; color: #0987a0; }
+        .badge-yellow { background: #faf089; color: #744210; }
+        .badge-gray { background: #e2e8f0; color: #4a5568; }
+        .progress { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        .progress-bar { height: 100%; transition: width 0.3s; }
+        .alert { padding: 12px; border-radius: 6px; margin-bottom: 12px; }
+        .alert-info { background: #bee3f8; color: #2c5aa0; }
+        .alert-warning { background: #fbd38d; color: #c05621; }
+        .stat { text-align: center; }
+        .stat-number { font-size: 24px; font-weight: bold; margin: 8px 0; }
+        .stat-label { font-size: 14px; color: #718096; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: white; border-radius: 8px; padding: 24px; max-width: 400px; width: 90%; }
+        .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 16px; }
+        .modal-footer { margin-top: 20px; text-align: right; }
+        .expense-item { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 8px; }
+        .hidden { display: none; }
+        h1 { text-align: center; margin-bottom: 8px; }
+        h2 { margin-bottom: 16px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 32px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const ExpenseTracker = () => {
+            const [expenses, setExpenses] = useState([]);
+            const [categories, setCategories] = useState([
+                'Food & Dining', 'Transportation', 'Shopping', 'Entertainment',
+                'Bills & Utilities', 'Healthcare', 'Education', 'Travel', 'Groceries', 'Other'
+            ]);
+            const [newExpense, setNewExpense] = useState({
+                amount: '', description: '', category: '',
+                date: new Date().toISOString().split('T')[0]
+            });
+            const [newCategoryName, setNewCategoryName] = useState('');
+            const [showModal, setShowModal] = useState(false);
+
+            const categoryColors = {
+                'Food & Dining': 'red', 'Transportation': 'blue', 'Shopping': 'purple',
+                'Entertainment': 'green', 'Bills & Utilities': 'orange', 'Healthcare': 'pink',
+                'Education': 'teal', 'Travel': 'cyan', 'Groceries': 'yellow', 'Other': 'gray'
+            };
+
+            const getColorForCategory = (category) => {
+                if (categoryColors[category]) return categoryColors[category];
+                const colors = ['red', 'blue', 'purple', 'green', 'orange', 'pink', 'teal', 'cyan', 'yellow', 'gray'];
+                return colors[category.length % colors.length];
+            };
+
+            useEffect(() => {
+                const savedExpenses = localStorage.getItem('expenses');
+                const savedCategories = localStorage.getItem('categories');
+                if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+                if (savedCategories) setCategories(JSON.parse(savedCategories));
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+            }, [expenses]);
+
+            useEffect(() => {
+                localStorage.setItem('categories', JSON.stringify(categories));
+            }, [categories]);
+
+            const addCategory = () => {
+                if (newCategoryName && !categories.includes(newCategoryName)) {
+                    setCategories([...categories, newCategoryName]);
+                    setNewCategoryName('');
+                    setShowModal(false);
+                }
+            };
+
+            const addExpense = () => {
+                if (newExpense.amount && newExpense.description && newExpense.category) {
+                    const expense = {
+                        id: Date.now(), ...newExpense,
+                        amount: parseFloat(newExpense.amount),
+                        date: new Date(newExpense.date)
+                    };
+                    setExpenses([...expenses, expense]);
+                    setNewExpense({
+                        amount: '', description: '', category: '',
+                        date: new Date().toISOString().split('T')[0]
+                    });
+                }
+            };
+
+            const getCurrentMonthExpenses = () => {
+                const currentMonth = new Date().getMonth();
+                const currentYear = new Date().getFullYear();
+                return expenses.filter(expense => {
+                    const expenseDate = new Date(expense.date);
+                    return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
+                });
+            };
+
+            const getCategoryAnalysis = () => {
+                const monthlyExpenses = getCurrentMonthExpenses();
+                const categoryTotals = {};
+                categories.forEach(category => {
+                    categoryTotals[category] = monthlyExpenses
+                        .filter(expense => expense.category === category)
+                        .reduce((sum, expense) => sum + expense.amount, 0);
+                });
+                return categoryTotals;
+            };
+
+            const getTotalMonthlySpending = () => {
+                return getCurrentMonthExpenses().reduce((sum, expense) => sum + expense.amount, 0);
+            };
+
+            const getSpendingSuggestions = () => {
+                const categoryTotals = getCategoryAnalysis();
+                const totalSpending = getTotalMonthlySpending();
+                const suggestions = [];
+
+                const sortedCategories = Object.entries(categoryTotals)
+                    .sort(([,a], [,b]) => b - a)
+                    .filter(([,amount]) => amount > 0);
+
+                if (sortedCategories.length > 0) {
+                    const [topCategory, topAmount] = sortedCategories[0];
+                    if (topAmount > totalSpending * 0.3) {
+                        suggestions.push({
+                            type: 'warning',
+                            message: `${topCategory} accounts for ${((topAmount/totalSpending)*100).toFixed(1)}% of your spending. Consider setting a budget limit.`
+                        });
+                    }
+                }
+
+                if (categoryTotals['Food & Dining'] > 500) {
+                    suggestions.push({
+                        type: 'tip',
+                        message: 'Try meal planning and cooking at home more often to reduce dining expenses.'
+                    });
+                }
+
+                if (categoryTotals['Entertainment'] > 300) {
+                    suggestions.push({
+                        type: 'tip',
+                        message: 'Look for free entertainment options like parks, free events, or home activities.'
+                    });
+                }
+
+                if (categoryTotals['Shopping'] > 400) {
+                    suggestions.push({
+                        type: 'tip',
+                        message: 'Implement a 24-hour rule before making non-essential purchases.'
+                    });
+                }
+
+                if (totalSpending > 2000) {
+                    suggestions.push({
+                        type: 'goal',
+                        message: 'Consider setting up an emergency fund with 10-15% of your monthly expenses.'
+                    });
+                }
+
+                return suggestions;
+            };
+
+            const categoryTotals = getCategoryAnalysis();
+            const totalSpending = getTotalMonthlySpending();
+            const monthlyExpenses = getCurrentMonthExpenses();
+            const suggestions = getSpendingSuggestions();
+
+            return (
+                <div className="container">
+                    <h1>💰 Personal Expense Tracker</h1>
+                    <p className="subtitle">Track, analyze, and optimize your daily expenses</p>
+
+                    {/* Add Expense Form */}
+                    <div className="card">
+                        <h2>Add New Expense</h2>
+                        <div className="grid grid-5">
+                            <input
+                                type="number"
+                                placeholder="Amount"
+                                value={newExpense.amount}
+                                onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+                            />
+                            <input
+                                type="text"
+                                placeholder="Description"
+                                value={newExpense.description}
+                                onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
+                            />
+                            <select
+                                value={newExpense.category}
+                                onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
+                            >
+                                <option value="">Select category</option>
+                                {categories.map(category => (
+                                    <option key={category} value={category}>{category}</option>
+                                ))}
+                            </select>
+                            <input
+                                type="date"
+                                value={newExpense.date}
+                                onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
+                            />
+                            <button className="secondary" onClick={() => setShowModal(true)}>
+                                <i className="fas fa-plus"></i> Add Category
+                            </button>
+                            <button onClick={addExpense}>
+                                <i className="fas fa-plus-circle"></i> Add Expense
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Monthly Overview */}
+                    <div className="grid grid-3">
+                        <div className="card stat">
+                            <i className="fas fa-dollar-sign" style={{fontSize: '32px', color: '#3182ce'}}></i>
+                            <div className="stat-number">${totalSpending.toFixed(2)}</div>
+                            <div className="stat-label">Total This Month</div>
+                        </div>
+                        <div className="card stat">
+                            <i className="fas fa-calendar" style={{fontSize: '32px', color: '#38a169'}}></i>
+                            <div className="stat-number">{monthlyExpenses.length}</div>
+                            <div className="stat-label">Expenses Count</div>
+                        </div>
+                        <div className="card stat">
+                            <i className="fas fa-target" style={{fontSize: '32px', color: '#d69e2e'}}></i>
+                            <div className="stat-number">
+                                ${monthlyExpenses.length > 0 ? (totalSpending / monthlyExpenses.length).toFixed(2) : '0.00'}
+                            </div>
+                            <div className="stat-label">Avg. Per Expense</div>
+                        </div>
+                    </div>
+
+                    {/* Categories Overview */}
+                    <div className="card">
+                        <h2>Your Categories ({categories.length})</h2>
+                        <div className="flex flex-wrap">
+                            {categories.map(category => (
+                                <span key={category} className={`badge badge-${getColorForCategory(category)}`}>
+                                    {category}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Category Analysis */}
+                    <div className="card">
+                        <h2>Monthly Category Analysis</h2>
+                        {Object.entries(categoryTotals)
+                            .filter(([, amount]) => amount > 0)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([category, amount]) => (
+                                <div key={category} style={{marginBottom: '16px'}}>
+                                    <div className="flex flex-between" style={{marginBottom: '8px'}}>
+                                        <span className={`badge badge-${getColorForCategory(category)}`}>
+                                            {category}
+                                        </span>
+                                        <span>
+                                            <strong>${amount.toFixed(2)}</strong>
+                                            <span style={{color: '#718096', marginLeft: '8px'}}>
+                                                ({((amount/totalSpending)*100).toFixed(1)}%)
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <div className="progress">
+                                        <div 
+                                            className={`progress-bar badge-${getColorForCategory(category)}`}
+                                            style={{
+                                                width: `${(amount/totalSpending)*100}%`,
+                                                backgroundColor: getColorForCategory(category) === 'red' ? '#c53030' :
+                                                                getColorForCategory(category) === 'blue' ? '#2b6cb0' :
+                                                                getColorForCategory(category) === 'green' ? '#25855a' :
+                                                                getColorForCategory(category) === 'purple' ? '#6b46c1' :
+                                                                getColorForCategory(category) === 'orange' ? '#c05621' :
+                                                                getColorForCategory(category) === 'pink' ? '#b83280' :
+                                                                getColorForCategory(category) === 'teal' ? '#2c7a7b' :
+                                                                getColorForCategory(category) === 'cyan' ? '#0987a0' :
+                                                                getColorForCategory(category) === 'yellow' ? '#744210' : '#4a5568'
+                                            }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            ))}
+                    </div>
+
+                    {/* Spending Suggestions */}
+                    {suggestions.length > 0 && (
+                        <div className="card">
+                            <h2>💡 Spending Optimization Suggestions</h2>
+                            {suggestions.map((suggestion, index) => (
+                                <div key={index} className={`alert alert-${suggestion.type === 'warning' ? 'warning' : 'info'}`}>
+                                    <i className={`fas fa-${suggestion.type === 'warning' ? 'exclamation-triangle' : 'info-circle'}`}></i>
+                                    {' ' + suggestion.message}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Recent Expenses */}
+                    <div className="card">
+                        <h2>Recent Expenses</h2>
+                        {monthlyExpenses.length === 0 ? (
+                            <p style={{textAlign: 'center', color: '#718096'}}>
+                                No expenses recorded yet. Add your first expense above!
+                            </p>
+                        ) : (
+                            monthlyExpenses
+                                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                                .slice(0, 10)
+                                .map((expense) => (
+                                    <div key={expense.id} className="expense-item">
+                                        <div className="flex flex-between">
+                                            <div className="flex">
+                                                <span className={`badge badge-${getColorForCategory(expense.category)}`} style={{marginRight: '12px'}}>
+                                                    {expense.category}
+                                                </span>
+                                                <span>{expense.description}</span>
+                                            </div>
+                                            <div className="flex">
+                                                <strong style={{marginRight: '12px'}}>${expense.amount.toFixed(2)}</strong>
+                                                <span style={{color: '#718096'}}>
+                                                    {new Date(expense.date).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                        )}
+                    </div>
+
+                    {/* Modal */}
+                    {showModal && (
+                        <div className="modal">
+                            <div className="modal-content">
+                                <div className="modal-header">Add New Category</div>
+                                <input
+                                    type="text"
+                                    placeholder="Enter new category name"
+                                    value={newCategoryName}
+                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                    style={{width: '100%', marginBottom: '16px'}}
+                                />
+                                <div className="modal-footer">
+                                    <button className="secondary" onClick={() => setShowModal(false)} style={{marginRight: '12px'}}>
+                                        Cancel
+                                    </button>
+                                    <button onClick={addCategory}>Add Category</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        ReactDOM.render(<ExpenseTracker />, document.getElementById('root'));
+    </script>
+</body>
+</html>
